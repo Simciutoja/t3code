@@ -909,7 +909,9 @@ function PullRequestsRouteView() {
       terminalAvailable={false}
       terminalOpen={false}
       terminalShortcutLabel={null}
-      rightPanelAvailable={rightPanelState.surfaces.length > 0}
+      // Opening the panel requires a selected PR. Retained panel surfaces alone
+      // are not enough: without a selected surface the toggle is a no-op.
+      rightPanelAvailable={rightPanelState.isOpen || selectedPullRequestSurface !== null}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={null}
       liveAgentCount={0}
