@@ -29,7 +29,7 @@ import {
   scopeThreadRef,
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
-import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
+import type { ContextMenuItem, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
   AlarmClockIcon,
@@ -118,7 +118,7 @@ import {
 import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import { cn } from "~/lib/utils";
-import { buildThreadActionMenuItems } from "./threadActionMenu.logic";
+import { buildThreadActionMenuItems, type ThreadActionMenuId } from "./threadActionMenu.logic";
 import {
   buildBulkTitleRegenerationContextMenuItem,
   formatWorkingDurationLabel,
@@ -162,7 +162,17 @@ import { useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "./ui/menu";
+import {
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "./ui/menu";
 import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
@@ -182,6 +192,65 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 // Keep the v2 key so existing preferences survive the v2-to-default rename.
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar-v2:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar-v2:snoozed-expanded";
+
+type ThreadContextMenuState = {
+  readonly items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>>;
+  readonly position: { readonly x: number; readonly y: number };
+  readonly resolve: (action: ThreadActionMenuId | undefined) => void;
+};
+
+function ThreadContextMenuItems({
+  items,
+  onSelect,
+}: {
+  readonly items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>>;
+  readonly onSelect: (action: ThreadActionMenuId) => void;
+}) {
+  return items.map((item) =>
+    item.children ? (
+      <MenuSub key={item.id}>
+        <MenuSubTrigger disabled={item.disabled}>{item.label}</MenuSubTrigger>
+        <MenuSubPopup className="min-w-52">
+          <ThreadContextMenuItems items={item.children} onSelect={onSelect} />
+        </MenuSubPopup>
+      </MenuSub>
+    ) : (
+      <MenuItem
+        key={item.id}
+        disabled={item.disabled}
+        variant={item.destructive ? "destructive" : "default"}
+        onClick={() => onSelect(item.id)}
+      >
+        {item.label}
+      </MenuItem>
+    ),
+  );
+}
+
+function ThreadContextMenu({
+  menu,
+  onDismiss,
+}: {
+  readonly menu: ThreadContextMenuState | null;
+  readonly onDismiss: () => void;
+}) {
+  const finish = (action: ThreadActionMenuId | undefined) => {
+    menu?.resolve(action);
+    onDismiss();
+  };
+  return (
+    <Menu open={menu !== null} onOpenChange={(open) => !open && finish(undefined)}>
+      <MenuTrigger
+        aria-label="Thread actions"
+        className="pointer-events-none fixed size-px opacity-0"
+        style={{ left: menu?.position.x ?? 0, top: menu?.position.y ?? 0 }}
+      />
+      <MenuPopup align="start" side="bottom" sideOffset={0} className="min-w-52">
+        {menu ? <ThreadContextMenuItems items={menu.items} onSelect={finish} /> : null}
+      </MenuPopup>
+    </Menu>
+  );
+}
 
 function compactSidebarTimeLabel(label: string): string {
   if (label === "just now") return "now";
@@ -1819,6 +1888,7 @@ export default function Sidebar() {
   // Project scope: one menu above the list. Scoping filters the list without
   // making the header width depend on the number or length of project names.
   const [projectScopeKey, setProjectScopeKey] = useState<string | null>(null);
+  const [threadContextMenu, setThreadContextMenu] = useState<ThreadContextMenuState | null>(null);
   const scopedProjectGroup = useMemo(
     () =>
       projectScopeKey === null
@@ -2909,6 +2979,17 @@ export default function Sidebar() {
     ],
   );
 
+  const showThreadContextMenu = useCallback(
+    (
+      items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>>,
+      position: { x: number; y: number },
+    ) =>
+      new Promise<ThreadActionMenuId | undefined>((resolve) => {
+        setThreadContextMenu({ items, position, resolve });
+      }),
+    [],
+  );
+
   const handleThreadContextMenu = useCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
       void (async () => {
@@ -2946,35 +3027,30 @@ export default function Sidebar() {
         const isPinned = thread.pinnedAt != null;
         // Presets resolve at menu-open time (same as the popover).
         const snoozePresets = resolveSnoozePresets(new Date(), timestampFormat);
-        const clicked = await settlePromise(() =>
-          api.contextMenu.show(
-            buildThreadActionMenuItems({
-              branch: thread.branch ?? null,
-              isPinned,
-              isSettled,
-              isSnoozed,
-              canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
-              isRegeneratingTitle,
-              supports: {
-                settlement: supportsSettlement,
-                snooze: supportsSnooze,
-                pinning: supportsPinning,
-                titleRegeneration: supportsTitleRegeneration,
-              },
-              snoozePresets,
-            }),
-            position,
-          ),
+        const clicked = await showThreadContextMenu(
+          buildThreadActionMenuItems({
+            branch: thread.branch ?? null,
+            isPinned,
+            isSettled,
+            isSnoozed,
+            canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
+            isRegeneratingTitle,
+            supports: {
+              settlement: supportsSettlement,
+              snooze: supportsSnooze,
+              pinning: supportsPinning,
+              titleRegeneration: supportsTitleRegeneration,
+            },
+            snoozePresets,
+          }),
+          position,
         );
-        if (clicked._tag === "Failure") return;
-        if (clicked.value?.startsWith("snooze:")) {
-          const preset = snoozePresets.find(
-            (candidate) => `snooze:${candidate.id}` === clicked.value,
-          );
+        if (clicked?.startsWith("snooze:")) {
+          const preset = snoozePresets.find((candidate) => `snooze:${candidate.id}` === clicked);
           if (preset) attemptSnooze(threadRef, preset);
           return;
         }
-        switch (clicked.value) {
+        switch (clicked) {
           case "new-thread-on-branch": {
             // Explicit branch carry-over: reuse the thread's worktree when it
             // has one, otherwise its branch on the local checkout.
@@ -3106,6 +3182,7 @@ export default function Sidebar() {
       markThreadUnread,
       projectCwdByKey,
       serverConfigs,
+      showThreadContextMenu,
       startThreadRename,
       updateThreadMetadata,
       timestampFormat,
@@ -3232,6 +3309,7 @@ export default function Sidebar() {
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
   return (
     <>
+      <ThreadContextMenu menu={threadContextMenu} onDismiss={() => setThreadContextMenu(null)} />
       <SidebarChromeHeader isElectron={isElectron} />
       <SidebarContent
         className="gap-0"
