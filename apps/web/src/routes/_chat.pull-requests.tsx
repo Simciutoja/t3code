@@ -1464,14 +1464,6 @@ function PullRequestsColumn({
             }}
           />
         ) : null}
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label="Refresh pull requests"
-          onClick={onRefresh}
-        >
-          <RefreshCwIcon className={cn("size-4", refreshing && "animate-spin")} />
-        </Button>
         {rightPanelControl}
       </header>
 
@@ -1487,6 +1479,14 @@ function PullRequestsColumn({
             <div ref={inFlowSearchRef} className="flex items-center gap-2">
               {searchInput}
               {filtersMenu}
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Refresh pull requests"
+                onClick={onRefresh}
+              >
+                <RefreshCwIcon className={cn("size-4", refreshing && "animate-spin")} />
+              </Button>
             </div>
             {/* Scrolled past this marker, the controls are gone and the title takes over. */}
             <div ref={markerRef} aria-hidden className="-mt-3 h-px w-full" />
