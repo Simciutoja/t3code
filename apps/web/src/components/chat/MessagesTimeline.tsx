@@ -2205,7 +2205,9 @@ const AgentSpawnCtaRow = memo(function AgentSpawnCtaRow(props: { workEntry: Time
         {totalTokens > 0 ? (
           <span className="tabular-nums">Σ {formatSubagentTokenCount(totalTokens)}</span>
         ) : null}
-        <span className="text-info-foreground">{live ? "Open Agents ▸" : "View ▸"}</span>
+        <span className="inline-flex items-center rounded-md border border-border/60 px-1.5 py-0.5 font-sans text-foreground transition-colors hover:border-border hover:bg-accent">
+          {live ? "Open agents" : "View agents"}
+        </span>
       </span>
     </button>
   );

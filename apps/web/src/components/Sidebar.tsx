@@ -375,7 +375,7 @@ function SnoozePopoverButton(props: {
           />
         }
       >
-        <ClockIcon className="size-3" />
+        <ClockIcon className="size-3.5" />
       </PopoverTrigger>
       <PopoverPopup side="bottom" align="end" className="w-56" viewportClassName="p-1">
         {presets.map((preset) => (
@@ -1351,7 +1351,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           topStatus.className,
                         )}
                       >
-                        <AlarmClockIcon aria-hidden className="size-4 shrink-0" />
+                        <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" />
                         <span role="status">{topStatus.label}</span>
                       </button>
                     ) : (
@@ -1408,7 +1408,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                         onClick={handleSettleClick}
                         className="-mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
                       >
-                        <CheckIcon className="size-3.5" />
+                        <CheckIcon className="size-3.5 shrink-0" />
                         Settle
                       </button>
                     ) : null}
@@ -3229,7 +3229,7 @@ export default function Sidebar() {
           // Lifted above the stage backdrop, whose fade bleeds below the
           // header and would otherwise paint across the search row's outline.
           <SidebarGroup className="relative z-[1] gap-1 p-[var(--sidebar-content-inset)]">
-            <div className="flex items-center gap-1">
+            <div className="order-2 flex items-center gap-1">
               <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
                 <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
                 <Input
@@ -3321,7 +3321,7 @@ export default function Sidebar() {
               </div>
             </div>
             {projectGroups.length > 0 ? (
-              <div className="flex items-center gap-1">
+              <div className="order-1 flex items-center gap-1">
                 <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>
                   <MenuTrigger
                     render={

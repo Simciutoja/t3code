@@ -1037,10 +1037,10 @@ export function PullRequestDetailPanel({
                       aria-pressed={tab === item.value}
                       onClick={() => setTab(item.value)}
                       className={cn(
-                        "rounded-md px-2 py-1 text-[11px] transition-colors",
+                        "border-b-2 border-transparent px-2 py-1 text-[11px] transition-colors",
                         tab === item.value
-                          ? "bg-accent text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                          ? "border-foreground text-foreground"
+                          : "text-muted-foreground hover:border-border hover:text-foreground",
                       )}
                     >
                       {item.label}
@@ -1188,10 +1188,10 @@ export function PullRequestDetailPanel({
                     aria-pressed={tab === item.value}
                     onClick={() => setTab(item.value)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors",
+                      "inline-flex items-center gap-1.5 border-b-2 border-transparent px-3 py-1.5 text-xs transition-colors",
                       tab === item.value
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? "border-foreground text-foreground"
+                        : "text-muted-foreground hover:border-border hover:text-foreground",
                     )}
                   >
                     {item.label}

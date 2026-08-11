@@ -686,17 +686,17 @@ export function EnvironmentProviderSettings({
                   <TooltipTrigger
                     render={
                       <Button
-                        size="icon-xs"
+                        size="icon-sm"
                         variant="ghost"
-                        className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                         disabled={isRefreshingProviders}
                         onClick={() => void refreshProviders()}
                         aria-label="Refresh provider status"
                       >
                         {isRefreshingProviders ? (
-                          <LoaderIcon className="size-3 animate-spin" />
+                          <LoaderIcon className="size-4 animate-spin" />
                         ) : (
-                          <RefreshCwIcon className="size-3" />
+                          <RefreshCwIcon className="size-4" />
                         )}
                       </Button>
                     }
