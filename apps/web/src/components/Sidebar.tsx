@@ -3189,6 +3189,16 @@ export default function Sidebar() {
   // for multi-project setups.
   const handleNewThreadClick = useCallback(
     (event?: ReactMouseEvent) => {
+      // The project scope is an explicit answer to "where should this thread
+      // live?" Respect it instead of immediately asking the same question in
+      // the command palette.
+      if (scopedProjectGroup !== null) {
+        if (isMobile) setOpenMobile(false);
+        void newThreadContext.handleNewThread(
+          scopeProjectRef(scopedProjectGroup.environmentId, scopedProjectGroup.id),
+        );
+        return;
+      }
       // One project: nothing to pick, create immediately. Shift+click creates
       // directly in the current project even with several projects, skipping
       // the palette picker.
@@ -3205,7 +3215,7 @@ export default function Sidebar() {
       if (isMobile) setOpenMobile(false);
       openCommandPalette({ open: "new-thread-in" });
     },
-    [isMobile, newThreadContext, projectGroups.length, setOpenMobile],
+    [isMobile, newThreadContext, projectGroups.length, scopedProjectGroup, setOpenMobile],
   );
 
   // The button mirrors chat.new: in multi-project setups both route through
@@ -3297,7 +3307,9 @@ export default function Sidebar() {
                     />
                   </TooltipTrigger>
                   <TooltipPopup side="right">
-                    {projectGroups.length > 1 ? (
+                    {scopedProjectGroup !== null ? (
+                      `New thread in ${scopedProjectGroup.displayName}`
+                    ) : projectGroups.length > 1 ? (
                       <span className="flex flex-col gap-0.5">
                         <span>
                           {newThreadShortcutLabel
