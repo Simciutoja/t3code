@@ -125,13 +125,13 @@ function ExpandableHeaderSearch({
             render={
               <Button
                 type="button"
-                size="icon-xs"
+                size="icon-sm"
                 variant="ghost"
-                className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground"
                 onClick={() => onOpenChange(true)}
                 aria-label="Search keybindings"
               >
-                <SearchIcon className="size-3" />
+                <SearchIcon className="size-4" />
               </Button>
             }
           />
@@ -1247,13 +1247,13 @@ export function KeybindingsSettingsPanel() {
                 render={
                   <Button
                     type="button"
-                    size="icon-xs"
+                    size="icon-sm"
                     variant="ghost"
-                    className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground"
                     onClick={() => setIsAddingBinding(true)}
                     aria-label="Add keybinding"
                   >
-                    <PlusIcon className="size-3" />
+                    <PlusIcon className="size-4" />
                   </Button>
                 }
               />
@@ -1264,14 +1264,14 @@ export function KeybindingsSettingsPanel() {
                 render={
                   <Button
                     type="button"
-                    size="icon-xs"
+                    size="icon-sm"
                     variant="ghost"
-                    className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground"
                     disabled={!keybindingsConfigPath}
                     onClick={openKeybindingsFile}
                     aria-label="Open keybindings.json"
                   >
-                    <FileJsonIcon className="size-3" />
+                    <FileJsonIcon className="size-4" />
                   </Button>
                 }
               />

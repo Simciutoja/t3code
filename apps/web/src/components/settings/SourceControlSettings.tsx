@@ -529,14 +529,14 @@ export function SourceControlSettingsPanel() {
       <TooltipTrigger
         render={
           <Button
-            size="icon-xs"
+            size="icon-sm"
             variant="ghost"
-            className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
             onClick={handleScan}
             disabled={discovery.isPending}
             aria-label="Rescan server environment"
           >
-            <RefreshCwIcon className={cn("size-3", discovery.isPending && "animate-spin")} />
+            <RefreshCwIcon className={cn("size-4", discovery.isPending && "animate-spin")} />
           </Button>
         }
       />

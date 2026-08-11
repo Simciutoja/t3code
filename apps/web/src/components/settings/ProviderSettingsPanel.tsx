@@ -670,13 +670,13 @@ export function EnvironmentProviderSettings({
                   <TooltipTrigger
                     render={
                       <Button
-                        size="icon-xs"
+                        size="icon-sm"
                         variant="ghost"
-                        className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                         onClick={() => setIsAddInstanceDialogOpen(true)}
                         aria-label="Add provider instance"
                       >
-                        <PlusIcon className="size-3" />
+                        <PlusIcon className="size-4" />
                       </Button>
                     }
                   />
