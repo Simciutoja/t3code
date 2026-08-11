@@ -61,6 +61,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -195,9 +196,15 @@ const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar-v2:snoozed-expanded";
 
 type ThreadContextMenuState = {
   readonly items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>>;
-  readonly position: { readonly x: number; readonly y: number };
-  readonly resolve: (action: ThreadActionMenuId | undefined) => void;
+  readonly anchor: NonNullable<ComponentProps<typeof MenuPopup>["anchor"]>;
+  readonly focusTarget: HTMLElement;
 };
+
+function contextMenuAnchor(position: { readonly x: number; readonly y: number }) {
+  return {
+    getBoundingClientRect: () => DOMRect.fromRect({ x: position.x, y: position.y }),
+  };
+}
 
 function ThreadContextMenuItems({
   items,
@@ -229,24 +236,42 @@ function ThreadContextMenuItems({
 
 function ThreadContextMenu({
   menu,
+  onSelect,
   onDismiss,
 }: {
   readonly menu: ThreadContextMenuState | null;
+  readonly onSelect: (action: ThreadActionMenuId) => void;
   readonly onDismiss: () => void;
 }) {
-  const finish = (action: ThreadActionMenuId | undefined) => {
-    menu?.resolve(action);
-    onDismiss();
-  };
+  const selectedRef = useRef(false);
   return (
-    <Menu open={menu !== null} onOpenChange={(open) => !open && finish(undefined)}>
-      <MenuTrigger
-        aria-label="Thread actions"
-        className="pointer-events-none fixed size-px opacity-0"
-        style={{ left: menu?.position.x ?? 0, top: menu?.position.y ?? 0 }}
-      />
-      <MenuPopup align="start" side="bottom" sideOffset={0} className="min-w-52">
-        {menu ? <ThreadContextMenuItems items={menu.items} onSelect={finish} /> : null}
+    <Menu
+      open={menu !== null}
+      onOpenChange={(open) => {
+        if (open) return;
+        if (!selectedRef.current) {
+          menu?.focusTarget.focus();
+          onDismiss();
+        }
+        selectedRef.current = false;
+      }}
+    >
+      <MenuPopup
+        anchor={menu?.anchor}
+        align="start"
+        side="bottom"
+        sideOffset={0}
+        className="min-w-52"
+      >
+        {menu ? (
+          <ThreadContextMenuItems
+            items={menu.items}
+            onSelect={(action) => {
+              selectedRef.current = true;
+              onSelect(action);
+            }}
+          />
+        ) : null}
       </MenuPopup>
     </Menu>
   );
@@ -763,7 +788,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   onCancelRename: () => void;
   isRenaming: boolean;
   renamingTitle: string;
-  onContextMenu: (threadRef: ScopedThreadRef, position: { x: number; y: number }) => void;
+  onContextMenu: (
+    threadRef: ScopedThreadRef,
+    position: { x: number; y: number },
+    focusTarget: HTMLElement,
+  ) => void;
   onSettle: (threadRef: ScopedThreadRef) => void;
   onUnsettle: (threadRef: ScopedThreadRef) => void;
   onSnooze: (threadRef: ScopedThreadRef, preset: SnoozePreset) => void;
@@ -972,7 +1001,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const handleContextMenu = useCallback(
     (event: ReactMouseEvent) => {
       event.preventDefault();
-      onContextMenu(threadRef, { x: event.clientX, y: event.clientY });
+      onContextMenu(
+        threadRef,
+        { x: event.clientX, y: event.clientY },
+        event.currentTarget as HTMLElement,
+      );
     },
     [onContextMenu, threadRef],
   );
@@ -1889,6 +1922,9 @@ export default function Sidebar() {
   // making the header width depend on the number or length of project names.
   const [projectScopeKey, setProjectScopeKey] = useState<string | null>(null);
   const [threadContextMenu, setThreadContextMenu] = useState<ThreadContextMenuState | null>(null);
+  const threadContextMenuResolveRef = useRef<
+    ((action: ThreadActionMenuId | undefined) => void) | null
+  >(null);
   const scopedProjectGroup = useMemo(
     () =>
       projectScopeKey === null
@@ -2983,15 +3019,25 @@ export default function Sidebar() {
     (
       items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>>,
       position: { x: number; y: number },
+      focusTarget: HTMLElement,
     ) =>
       new Promise<ThreadActionMenuId | undefined>((resolve) => {
-        setThreadContextMenu({ items, position, resolve });
+        threadContextMenuResolveRef.current?.(undefined);
+        threadContextMenuResolveRef.current = resolve;
+        setThreadContextMenu({ items, anchor: contextMenuAnchor(position), focusTarget });
       }),
     [],
   );
 
+  const resolveThreadContextMenu = useCallback((action: ThreadActionMenuId | undefined) => {
+    const resolve = threadContextMenuResolveRef.current;
+    threadContextMenuResolveRef.current = null;
+    setThreadContextMenu(null);
+    resolve?.(action);
+  }, []);
+
   const handleThreadContextMenu = useCallback(
-    (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
+    (threadRef: ScopedThreadRef, position: { x: number; y: number }, focusTarget: HTMLElement) => {
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
@@ -3044,6 +3090,7 @@ export default function Sidebar() {
             snoozePresets,
           }),
           position,
+          focusTarget,
         );
         if (clicked?.startsWith("snooze:")) {
           const preset = snoozePresets.find((candidate) => `snooze:${candidate.id}` === clicked);
@@ -3309,7 +3356,11 @@ export default function Sidebar() {
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
   return (
     <>
-      <ThreadContextMenu menu={threadContextMenu} onDismiss={() => setThreadContextMenu(null)} />
+      <ThreadContextMenu
+        menu={threadContextMenu}
+        onSelect={(action) => resolveThreadContextMenu(action)}
+        onDismiss={() => resolveThreadContextMenu(undefined)}
+      />
       <SidebarChromeHeader isElectron={isElectron} />
       <SidebarContent
         className="gap-0"
@@ -3317,101 +3368,8 @@ export default function Sidebar() {
           // Lifted above the stage backdrop, whose fade bleeds below the
           // header and would otherwise paint across the search row's outline.
           <SidebarGroup className="relative z-[1] gap-1 p-[var(--sidebar-content-inset)]">
-            <div className="order-2 flex items-center gap-1">
-              <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-                <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
-                <Input
-                  ref={threadSearchInputRef}
-                  nativeInput
-                  unstyled
-                  type="search"
-                  value={threadSearchQuery}
-                  onChange={(event) => {
-                    setThreadSearchQuery(event.currentTarget.value);
-                    setActiveSearchResultIndex(0);
-                  }}
-                  onKeyDown={handleThreadSearchKeyDown}
-                  placeholder="Search"
-                  aria-label="Search threads"
-                  role="combobox"
-                  aria-autocomplete="list"
-                  aria-expanded={isSearchingThreads && threadSearchResults.length > 0}
-                  aria-controls={
-                    isSearchingThreads && threadSearchResults.length > 0
-                      ? "sidebar-thread-search-results"
-                      : undefined
-                  }
-                  aria-activedescendant={
-                    isSearchingThreads && threadSearchResults[activeSearchResultIndex]
-                      ? `sidebar-thread-search-result-${activeSearchResultIndex}`
-                      : undefined
-                  }
-                  className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
-                />
-                {isSearchingThreads ? (
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="ghost"
-                    className="size-5 shrink-0 rounded-sm text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
-                    aria-label="Clear thread search"
-                    onClick={() => {
-                      clearThreadSearch();
-                      threadSearchInputRef.current?.focus();
-                    }}
-                  >
-                    <XIcon className="size-3" />
-                  </Button>
-                ) : null}
-              </div>
-              <div className="shrink-0">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <SidebarMenuButton
-                        size="icon"
-                        type="button"
-                        className="relative focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                        onClick={handleNewThreadClick}
-                        disabled={projects.length === 0}
-                        aria-label="New thread"
-                      />
-                    }
-                  >
-                    <SquarePenIcon />
-                    <span
-                      className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-                      aria-hidden="true"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="right">
-                    {scopedProjectGroup !== null ? (
-                      `New thread in ${scopedProjectGroup.displayName}`
-                    ) : projectGroups.length > 1 ? (
-                      <span className="flex flex-col gap-0.5">
-                        <span>
-                          {newThreadShortcutLabel
-                            ? `New thread (${newThreadShortcutLabel})`
-                            : "New thread"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          New thread in current project: Shift+click
-                          {newThreadInProjectShortcutLabel
-                            ? ` (${newThreadInProjectShortcutLabel})`
-                            : ""}
-                        </span>
-                      </span>
-                    ) : newThreadShortcutLabel ? (
-                      `New thread (${newThreadShortcutLabel})`
-                    ) : (
-                      "New thread"
-                    )}
-                  </TooltipPopup>
-                </Tooltip>
-              </div>
-            </div>
             {projectGroups.length > 0 ? (
-              <div className="order-1 flex items-center gap-1">
+              <div className="flex items-center gap-1">
                 <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>
                   <MenuTrigger
                     render={
@@ -3507,6 +3465,99 @@ export default function Sidebar() {
                 </Tooltip>
               </div>
             ) : null}
+            <div className="flex items-center gap-1">
+              <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+                <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
+                <Input
+                  ref={threadSearchInputRef}
+                  nativeInput
+                  unstyled
+                  type="search"
+                  value={threadSearchQuery}
+                  onChange={(event) => {
+                    setThreadSearchQuery(event.currentTarget.value);
+                    setActiveSearchResultIndex(0);
+                  }}
+                  onKeyDown={handleThreadSearchKeyDown}
+                  placeholder="Search"
+                  aria-label="Search threads"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={isSearchingThreads && threadSearchResults.length > 0}
+                  aria-controls={
+                    isSearchingThreads && threadSearchResults.length > 0
+                      ? "sidebar-thread-search-results"
+                      : undefined
+                  }
+                  aria-activedescendant={
+                    isSearchingThreads && threadSearchResults[activeSearchResultIndex]
+                      ? `sidebar-thread-search-result-${activeSearchResultIndex}`
+                      : undefined
+                  }
+                  className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
+                />
+                {isSearchingThreads ? (
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    className="size-5 shrink-0 rounded-sm text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
+                    aria-label="Clear thread search"
+                    onClick={() => {
+                      clearThreadSearch();
+                      threadSearchInputRef.current?.focus();
+                    }}
+                  >
+                    <XIcon className="size-3" />
+                  </Button>
+                ) : null}
+              </div>
+              <div className="shrink-0">
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <SidebarMenuButton
+                        size="icon"
+                        type="button"
+                        className="relative focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                        onClick={handleNewThreadClick}
+                        disabled={projects.length === 0}
+                        aria-label="New thread"
+                      />
+                    }
+                  >
+                    <SquarePenIcon />
+                    <span
+                      className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
+                      aria-hidden="true"
+                    />
+                  </TooltipTrigger>
+                  <TooltipPopup side="right">
+                    {scopedProjectGroup !== null ? (
+                      `New thread in ${scopedProjectGroup.displayName}`
+                    ) : projectGroups.length > 1 ? (
+                      <span className="flex flex-col gap-0.5">
+                        <span>
+                          {newThreadShortcutLabel
+                            ? `New thread (${newThreadShortcutLabel})`
+                            : "New thread"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          New thread in current project: Shift+click
+                          {newThreadInProjectShortcutLabel
+                            ? ` (${newThreadInProjectShortcutLabel})`
+                            : ""}
+                        </span>
+                      </span>
+                    ) : newThreadShortcutLabel ? (
+                      `New thread (${newThreadShortcutLabel})`
+                    ) : (
+                      "New thread"
+                    )}
+                  </TooltipPopup>
+                </Tooltip>
+              </div>
+            </div>
           </SidebarGroup>
         }
       >
